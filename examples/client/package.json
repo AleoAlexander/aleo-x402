@@ -1,0 +1,19 @@
+{
+  "name": "@x402/example-client",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Example: AI agent paying for API access with Aleo USDCx",
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@provablehq/sdk": "^0.9.16",
+    "@x402/aleo": "workspace:*",
+    "@x402/core": "^2.5.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.0.0",
+    "typescript": "^5.7.0"
+  }
+}
