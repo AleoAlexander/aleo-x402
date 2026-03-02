@@ -1,6 +1,6 @@
 # Aleo x402
 
-## WARNING: This has not been tested or audited and is not yet ready for production!  Use at your own risk.
+### WARNING: This has not been tested or audited and is not yet ready for production!  Use at your own risk.
 
 Private micropayments over HTTP using Aleo zero-knowledge proofs and the [x402 protocol](https://github.com/coinbase/x402).
 
