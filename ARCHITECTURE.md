@@ -55,7 +55,7 @@ This is a safe trade-off because recipient and amount are already disclosed in t
 
 ```mermaid
 sequenceDiagram
-    participant P as Proving Service
+    participant P as Delegated Proving Service
     participant C as Client
     participant S as Resource Server
     participant F as Facilitator
