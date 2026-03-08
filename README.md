@@ -45,15 +45,71 @@ ALEO_PRIVATE_KEY=APrivateKey1... API_URL=http://localhost:3000 pnpm start
 
 ## Payment Flow
 
+### Local Proving
+
+The client generates the ZK proof on its own hardware. Slower (~30-60s) but fully private — the private key and records never leave the client.
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant S as Resource Server
+    participant F as Facilitator
+    participant A as Aleo Network
+
+    C->>S: GET /resource
+    S-->>C: 402 { payTo, amount, asset }
+
+    rect rgb(240, 240, 255)
+    Note over C: Local proving (~30-60s)<br/>Build usdcx_transfer_with_proof tx<br/>Private key & records stay on client
+    end
+
+    C->>S: GET /resource + X-PAYMENT { transaction, payer }
+    S->>F: POST /verify { transaction, payer }
+
+    Note over F: Parse tx, read public inputs<br/>Verify: recipient === payTo<br/>Verify: amount >= required
+
+    F-->>S: { isValid: true }
+    S-->>C: 200 + resource (optimistic)
+
+    S->>F: POST /settle { transaction }
+    F->>A: Broadcast transaction
+    A-->>F: Confirmed on-chain
+    F-->>S: { success: true, txId }
 ```
-Client  →  GET /resource                        →  Server
-Client  ←  402 + payment requirements           ←  Server
-Client  →  Build ZK-proved tx (public inputs: recipient, amount)
-Client  →  GET /resource + X-PAYMENT header     →  Server
-Server  →  POST /verify {tx, payer}             →  Facilitator
-Server  ←  ✓ verified                           ←  Facilitator
-Client  ←  200 + resource (optimistic)          ←  Server
-Server  →  POST /settle {tx}                    →  Facilitator → Aleo network
+
+### Delegated Proving
+
+The client delegates proof generation to a remote prover (e.g. [Provable's proving service](https://developer.aleo.org/)). Faster (~5-10s) but requires sending the private inputs to the prover — the client must trust the proving service.
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant P as Proving Service
+    participant S as Resource Server
+    participant F as Facilitator
+    participant A as Aleo Network
+
+    C->>S: GET /resource
+    S-->>C: 402 { payTo, amount, asset }
+
+    rect rgb(255, 245, 235)
+    C->>P: Execute usdcx_transfer_with_proof<br/>(private key, inputs)
+    Note over P: Remote proving (~5-10s)
+    P-->>C: Serialized transaction
+    end
+
+    C->>S: GET /resource + X-PAYMENT { transaction, payer }
+    S->>F: POST /verify { transaction, payer }
+
+    Note over F: Parse tx, read public inputs<br/>Verify: recipient === payTo<br/>Verify: amount >= required
+
+    F-->>S: { isValid: true }
+    S-->>C: 200 + resource (optimistic)
+
+    S->>F: POST /settle { transaction }
+    F->>A: Broadcast transaction
+    A-->>F: Confirmed on-chain
+    F-->>S: { success: true, txId }
 ```
 
 ## How It Differs from EVM/Solana x402
