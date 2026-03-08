@@ -1,6 +1,6 @@
 # @x402/aleo
 
-Aleo blockchain mechanism for the [x402 payment protocol](https://github.com/x402). Implements private stablecoin (USDCx) transfers with zero-knowledge proofs and Transition View Key (TVK) selective disclosure.
+Aleo blockchain mechanism for the [x402 payment protocol](https://github.com/x402). Implements private stablecoin (USDCx) transfers with zero-knowledge proofs, using a wrapper program that exposes recipient and amount as **public inputs** for facilitator verification.
 
 ## Installation
 
@@ -22,15 +22,15 @@ This package provides the Aleo-specific `exact` scheme implementation across the
 |------|-------|---------|
 | **Client** | `ExactAleoClientScheme` | Builds private transfer transactions with ZK proofs |
 | **Server** | `ExactAleoServerScheme` | Parses prices and configures payment requirements |
-| **Facilitator** | `ExactAleoFacilitatorScheme` | Verifies transactions via TVK decryption, broadcasts and confirms on-chain |
+| **Facilitator** | `ExactAleoFacilitatorScheme` | Verifies transactions by reading public inputs, broadcasts and confirms on-chain |
 
-The payment flow uses the USDCx compliant stablecoin program (`usdcx_stablecoin.aleo`), which enforces freeze-list compliance via Credentials records.
+The payment flow uses the `x402.aleo` wrapper program, which calls the USDCx compliant stablecoin program (`usdcx_stablecoin.aleo`) while exposing recipient and amount as public inputs. The underlying stablecoin program enforces freeze-list compliance via Credentials records.
 
-### How TVK Verification Works
+### How Verification Works
 
-1. The **client** builds a `transfer_private_with_creds` transaction (fully proved, not broadcast) and derives a Transition View Key (TVK) from the transition's TPK.
-2. The client sends the serialized transaction + TVK to the facilitator (via the server).
-3. The **facilitator** uses the TVK to decrypt the transition's private inputs and verify the recipient address and amount — without learning anything else about the sender's records.
+1. The **client** builds a `usdcx_transfer_with_proof` transaction via the `x402.aleo` wrapper program (fully proved, not broadcast). The wrapper exposes recipient and amount as public inputs.
+2. The client sends the serialized transaction + payer address to the facilitator (via the server).
+3. The **facilitator** reads the public inputs from the transaction's transition to verify the recipient address and amount — no decryption needed.
 4. Once verified, the facilitator broadcasts the transaction and waits for on-chain confirmation.
 
 ## Usage
@@ -123,8 +123,9 @@ registerExactAleoFacilitatorScheme(facilitator, {
 | `USDCX_PROGRAM_ID_MAINNET` | `"usdcx_stablecoin.aleo"` | USDCx program (mainnet) |
 | `USDCX_PROGRAM_ID_TESTNET` | `"test_usdcx_stablecoin.aleo"` | USDCx program (testnet) |
 | `USDCX_DECIMALS` | `6` | Decimal places (1 USDCx = 1,000,000 micro-units) |
-| `TRANSFER_FUNCTION` | `"transfer_private_with_creds"` | Recommended transfer function |
-| `TRANSFER_FUNCTION_NO_CREDS` | `"transfer_private"` | Fallback (uses Merkle proofs) |
+| `X402_PROGRAM_ID_TESTNET` | `"x402.aleo"` | x402 wrapper program (testnet) |
+| `X402_PROGRAM_IDS` | `Record<string, string>` | Map of network to x402 wrapper program ID |
+| `USDCX_TRANSFER_FUNCTION` | `"usdcx_transfer_with_proof"` | Transfer function in the x402 wrapper program |
 
 ## Utilities
 
@@ -134,8 +135,7 @@ Low-level functions for working with Aleo transactions directly:
 import {
   parseTransaction,
   getTransferTransition,
-  decryptTransition,
-  extractTransferInputs,
+  extractPublicInputs,
   getTransactionId,
   parseAleoInteger,
   isValidAleoAddress,
@@ -147,8 +147,7 @@ import {
 | `parseTransaction(serialized)` | Parse a serialized transaction string into a WASM `Transaction` object |
 | `getTransactionId(serialized)` | Extract the transaction ID (`at1...`) from a serialized transaction |
 | `getTransferTransition(tx)` | Get the first execution transition from a parsed transaction |
-| `decryptTransition(transition, tvk)` | Decrypt a transition's private inputs using a TVK |
-| `extractTransferInputs(decrypted)` | Extract `{ recipient, amount }` from a decrypted transition |
+| `extractPublicInputs(transition)` | Extract `{ recipient, amount }` from a transition's public inputs |
 | `parseAleoInteger(value)` | Parse an Aleo integer string (e.g. `"1000000u128"`) to `bigint` |
 | `isValidAleoAddress(address)` | Validate an `aleo1...` address format |
 
@@ -164,7 +163,7 @@ pnpm --filter @x402/aleo test
 
 ### Integration Tests
 
-Integration tests exercise the real cryptographic flow — building ZK-proved transactions, generating TVKs, and decrypting transitions. They require a funded testnet account with both Token and Credentials records.
+Integration tests exercise the real cryptographic flow — building ZK-proved transactions via the x402 wrapper program and verifying public inputs. They require a funded testnet account with both Token and Credentials records.
 
 #### Setup
 
@@ -196,11 +195,11 @@ pnpm --filter @x402/aleo test:integration
 This takes 30-60 seconds (ZK proof generation). On first run, proving keys are downloaded and cached. The test:
 
 1. Generates a fresh recipient account
-2. Builds a `transfer_private_with_creds` transaction with ZK proofs
+2. Builds a `usdcx_transfer_with_proof` transaction via the x402 wrapper program with ZK proofs
 3. Parses the serialized transaction and extracts the transfer transition
 4. Verifies the transition targets the correct program and function
-5. Decrypts the transition using the TVK
-6. Asserts the decrypted recipient and amount match the original inputs
+5. Extracts public inputs (recipient and amount) from the transition
+6. Asserts the extracted recipient and amount match the original inputs
 
 If env vars are missing, the integration suite is skipped automatically.
 
@@ -226,7 +225,7 @@ packages/aleo/
 │   ├── facilitator-scheme.test.ts       # Facilitator verify/settle unit tests
 │   ├── server-scheme.test.ts            # Server price parsing unit tests
 │   ├── utils.test.ts                    # Utility function unit tests
-│   └── tvk-roundtrip.integration.test.ts # End-to-end TVK integration test
+│   └── tvk-roundtrip.integration.test.ts # End-to-end public inputs integration test
 ├── vitest.config.ts                     # Unit test config (excludes integration)
 ├── vitest.integration.config.ts         # Integration test config (180s timeout)
 ├── .env.example                         # Template for integration test env vars
