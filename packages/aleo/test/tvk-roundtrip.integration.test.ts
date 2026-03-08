@@ -4,14 +4,13 @@ import { toClientAleoSigner } from "../src/signers/clientSigner.js";
 import {
   parseTransaction,
   getTransferTransition,
-  decryptTransition,
-  extractTransferInputs,
+  extractPublicInputs,
   getTransactionId,
 } from "../src/utils.js";
 import {
   ALEO_TESTNET,
-  USDCX_PROGRAM_ID_TESTNET,
-  TRANSFER_FUNCTION,
+  X402_PROGRAM_ID_TESTNET,
+  USDCX_TRANSFER_FUNCTION,
 } from "../src/constants.js";
 
 const PRIVATE_KEY = process.env.ALEO_PRIVATE_KEY;
@@ -20,8 +19,8 @@ const TOKEN_RECORD = process.env.ALEO_TOKEN_RECORD;
 
 const hasEnv = !!(PRIVATE_KEY && CREDENTIALS_RECORD && TOKEN_RECORD);
 
-describe.skipIf(!hasEnv)("TVK round-trip integration", () => {
-  it("should build tx, decrypt with TVK, and extract correct inputs", async () => {
+describe.skipIf(!hasEnv)("Public inputs round-trip integration", () => {
+  it("should build tx and extract correct public inputs", async () => {
     // Generate a fresh recipient so we never collide with real accounts
     const recipient = new Account();
     const recipientAddress = recipient.address().toString();
@@ -35,12 +34,11 @@ describe.skipIf(!hasEnv)("TVK round-trip integration", () => {
     });
 
     // 1. Build a private transfer transaction (generates ZK proofs)
-    const { transaction, transitionViewKey } =
-      await signer.buildPrivateTransfer(
-        recipientAddress,
-        transferAmount,
-        USDCX_PROGRAM_ID_TESTNET,
-      );
+    const { transaction } = await signer.buildPrivateTransfer(
+      recipientAddress,
+      transferAmount,
+      X402_PROGRAM_ID_TESTNET,
+    );
 
     // 2. Parse the serialized transaction
     const tx = parseTransaction(transaction);
@@ -49,18 +47,15 @@ describe.skipIf(!hasEnv)("TVK round-trip integration", () => {
     const transition = getTransferTransition(tx);
 
     // 4. Verify program and function
-    expect(transition.programId()).toBe(USDCX_PROGRAM_ID_TESTNET);
-    expect(transition.functionName()).toBe(TRANSFER_FUNCTION);
+    expect(transition.programId()).toBe(X402_PROGRAM_ID_TESTNET);
+    expect(transition.functionName()).toBe(USDCX_TRANSFER_FUNCTION);
 
-    // 5. Decrypt the transition using the TVK
-    const decrypted = decryptTransition(transition, transitionViewKey);
-
-    // 6. Extract and verify the transfer inputs
-    const inputs = extractTransferInputs(decrypted);
+    // 5. Extract and verify the public inputs
+    const inputs = extractPublicInputs(transition);
     expect(inputs.recipient).toBe(recipientAddress);
     expect(inputs.amount).toBe(transferAmount);
 
-    // 7. Verify the transaction ID format
+    // 6. Verify the transaction ID format
     const txId = getTransactionId(transaction);
     expect(txId).toMatch(/^at1/);
   });
