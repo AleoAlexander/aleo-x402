@@ -1,4 +1,5 @@
 node_modules/
+leo/
 dist/
 .DS_Store
 *.tsbuildinfo
