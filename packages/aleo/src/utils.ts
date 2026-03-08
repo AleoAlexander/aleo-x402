@@ -18,7 +18,7 @@ export function getTransactionId(serialized: string): string {
 
 /**
  * Extract the first execution transition from a transaction.
- * For transfer_private transactions, this is the transfer transition.
+ * For x402 wrapper transactions, this is the usdcx_transfer_with_proof transition.
  *
  * @throws Error if the transaction has no transitions
  */
@@ -56,9 +56,20 @@ export function extractPublicInputs(transition: Transition): {
     );
   }
 
-  // input[0] is the recipient address (public), input[1] is the amount (public)
   const recipientInput = inputs[0];
   const amountInput = inputs[1];
+
+  // Validate that inputs are actually public (security: reject non-wrapper transactions)
+  if (recipientInput && typeof recipientInput === "object" && "type" in recipientInput) {
+    if ((recipientInput as { type: string }).type !== "public") {
+      throw new Error("Expected recipient input to be public");
+    }
+  }
+  if (amountInput && typeof amountInput === "object" && "type" in amountInput) {
+    if ((amountInput as { type: string }).type !== "public") {
+      throw new Error("Expected amount input to be public");
+    }
+  }
 
   const recipient = extractInputValue(recipientInput);
   const amountStr = extractInputValue(amountInput);
@@ -71,7 +82,7 @@ export function extractPublicInputs(transition: Transition): {
 
 /**
  * Extract a value from a transition input object.
- * The input object format from WASM is: { type: "private"|"public", id: "...", value: "..." }
+ * The input object format from WASM is: { type: "public", id: "...", value: "..." }
  */
 function extractInputValue(input: unknown): string {
   if (input && typeof input === "object" && "value" in input) {

@@ -25,7 +25,7 @@ export const USDCX_MULTIPLIER = 10 ** USDCX_DECIMALS;
 /** x402 wrapper program ID on testnet */
 export const X402_PROGRAM_ID_TESTNET = "x402.aleo";
 
-/** Map network to x402 wrapper program ID */
+/** Map network to x402 wrapper program ID (mainnet: not yet deployed) */
 export const X402_PROGRAM_IDS: Record<string, string> = {
   [ALEO_TESTNET]: X402_PROGRAM_ID_TESTNET,
 };

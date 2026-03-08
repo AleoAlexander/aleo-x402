@@ -5,7 +5,6 @@ import {
   AleoKeyProvider,
   NetworkRecordProvider,
 } from "@provablehq/sdk";
-import type { RecordPlaintext } from "@provablehq/sdk";
 import type { ClientAleoSigner } from "../signer.js";
 import {
   ALEO_API_URLS,
@@ -131,32 +130,18 @@ export function toClientAleoSigner(
       const transitions = tx.transitions();
       if (transitions && transitions.length > 0) {
         const transferTransition = transitions[0];
-
-        // Cache the returned Credentials record
         try {
           const outputs = transferTransition.ownedRecords(account.viewKey());
           for (const record of outputs) {
             const recordStr = record.toString();
             if (recordStr.includes("freeze_list_root")) {
               cachedCredentials = recordStr;
-              break;
+            } else if (recordStr.includes("amount")) {
+              cachedTokenRecord = recordStr;
             }
           }
         } catch {
           cachedCredentials = undefined;
-        }
-
-        // Cache the change Token record
-        try {
-          const outputs = transferTransition.ownedRecords(account.viewKey());
-          for (const record of outputs) {
-            const recordStr = record.toString();
-            if (recordStr.includes("amount") && !recordStr.includes("freeze_list_root")) {
-              cachedTokenRecord = recordStr;
-              break;
-            }
-          }
-        } catch {
           cachedTokenRecord = undefined;
         }
       }
