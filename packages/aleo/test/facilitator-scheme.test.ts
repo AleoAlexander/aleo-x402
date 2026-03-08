@@ -5,19 +5,19 @@ import type { PaymentPayload, PaymentRequirements } from "@x402/core/types";
 import { AleoErrorReason } from "../src/types.js";
 import {
   ALEO_TESTNET,
-  USDCX_PROGRAM_IDS,
-  TRANSFER_FUNCTION,
+  X402_PROGRAM_IDS,
+  USDCX_TRANSFER_FUNCTION,
 } from "../src/constants.js";
 
 let txCounter = 0;
 
-const TESTNET_ASSET = USDCX_PROGRAM_IDS[ALEO_TESTNET];
+const TESTNET_ASSET = X402_PROGRAM_IDS[ALEO_TESTNET];
 
 // Mock transition object with programId/functionName methods
 function createMockTransition() {
   return {
     programId: vi.fn(() => TESTNET_ASSET),
-    functionName: vi.fn(() => TRANSFER_FUNCTION),
+    functionName: vi.fn(() => USDCX_TRANSFER_FUNCTION),
   };
 }
 
@@ -25,7 +25,6 @@ function createMockTransition() {
 vi.mock("../src/utils.js", () => ({
   extractAleoPayload: vi.fn((payload: Record<string, unknown>) => ({
     transaction: payload.transaction as string,
-    transitionViewKey: payload.transitionViewKey as string,
     payer: payload.payer as string,
   })),
   getTransactionId: vi.fn(() => `at1mock_tx_id_${++txCounter}`),
@@ -34,8 +33,7 @@ vi.mock("../src/utils.js", () => ({
     transitions: () => [createMockTransition()],
   })),
   getTransferTransition: vi.fn(() => createMockTransition()),
-  decryptTransition: vi.fn(() => ({ mock: true })),
-  extractTransferInputs: vi.fn(() => ({
+  extractPublicInputs: vi.fn(() => ({
     recipient: "aleo1recipient0addr00000000000000000000000000000000000000000000",
     amount: BigInt(100000),
   })),
@@ -66,7 +64,6 @@ function createPayload(overrides: Partial<Record<string, unknown>> = {}): Paymen
     },
     payload: {
       transaction: '{"type":"execute","id":"at1mock_tx_id_123"}',
-      transitionViewKey: "123field",
       payer: "aleo1payer0address000000000000000000000000000000000000000000000",
       ...overrides,
     },
@@ -158,7 +155,7 @@ describe("ExactAleoScheme (facilitator)", () => {
       expect(result.invalidMessage).toContain("wrong_program.aleo");
     });
 
-    it("should reject if function name is not a known transfer variant", async () => {
+    it("should reject if function name is not usdcx_transfer_with_proof", async () => {
       // Override getTransferTransition to return a transition with an unexpected function
       const { getTransferTransition } = await import("../src/utils.js");
       (getTransferTransition as ReturnType<typeof vi.fn>).mockReturnValueOnce({

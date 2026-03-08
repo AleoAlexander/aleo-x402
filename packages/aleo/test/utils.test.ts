@@ -65,7 +65,6 @@ describe("utils", () => {
     it("should extract valid payload", () => {
       const payload = {
         transaction: '{"type":"execute"}',
-        transitionViewKey: "123field",
         payer: "aleo1abc",
       };
       const result = extractAleoPayload(payload);
@@ -74,19 +73,13 @@ describe("utils", () => {
 
     it("should throw for missing transaction", () => {
       expect(() =>
-        extractAleoPayload({ transitionViewKey: "f", payer: "p" }),
+        extractAleoPayload({ payer: "p" }),
       ).toThrow("Missing or invalid 'transaction'");
-    });
-
-    it("should throw for missing transitionViewKey", () => {
-      expect(() =>
-        extractAleoPayload({ transaction: "t", payer: "p" }),
-      ).toThrow("Missing or invalid 'transitionViewKey'");
     });
 
     it("should throw for missing payer", () => {
       expect(() =>
-        extractAleoPayload({ transaction: "t", transitionViewKey: "f" }),
+        extractAleoPayload({ transaction: "t" }),
       ).toThrow("Missing or invalid 'payer'");
     });
   });
