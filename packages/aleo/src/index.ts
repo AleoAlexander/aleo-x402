@@ -22,9 +22,9 @@ export {
   USDCX_MULTIPLIER,
   ALEO_API_URLS,
   SCHEME,
-  TRANSFER_FUNCTION,
-  TRANSFER_FUNCTION_NO_CREDS,
-  GET_CREDENTIALS_FUNCTION,
+  X402_PROGRAM_ID_TESTNET,
+  X402_PROGRAM_IDS,
+  USDCX_TRANSFER_FUNCTION,
 } from "./constants.js";
 
 // Client scheme
@@ -47,8 +47,7 @@ export {
   parseTransaction,
   getTransactionId,
   getTransferTransition,
-  decryptTransition,
-  extractTransferInputs,
+  extractPublicInputs,
   parseAleoInteger,
   parseAleoU64,
   isValidAleoAddress,

@@ -5,14 +5,13 @@ import type {
   PaymentPayloadContext,
 } from "@x402/core/types";
 import type { ClientAleoSigner } from "../../signer.js";
-import { SCHEME, USDCX_PROGRAM_IDS } from "../../constants.js";
+import { SCHEME, X402_PROGRAM_IDS } from "../../constants.js";
 
 /**
  * Aleo client scheme for the "exact" payment mechanism.
  *
- * Builds a fully-proved transfer_private transaction and provides
- * a Transition View Key (TVK) for selective disclosure of the
- * transfer's recipient and amount.
+ * Builds a fully-proved x402 wrapper transaction where recipient
+ * and amount are exposed as public inputs for facilitator verification.
  */
 export class ExactAleoScheme implements SchemeNetworkClient {
   readonly scheme = SCHEME;
@@ -26,14 +25,14 @@ export class ExactAleoScheme implements SchemeNetworkClient {
   ): Promise<PaymentPayloadResult> {
     const { payTo, amount, network, asset } = paymentRequirements;
 
-    // Resolve the USDCx program ID for this network
-    const programId = asset || USDCX_PROGRAM_IDS[network];
+    // Resolve the x402 wrapper program ID for this network
+    const programId = asset || X402_PROGRAM_IDS[network];
     if (!programId) {
-      throw new Error(`No USDCx program ID configured for network: ${network}`);
+      throw new Error(`No x402 program ID configured for network: ${network}`);
     }
 
-    // Build the transfer_private transaction with ZK proofs
-    const { transaction, transitionViewKey } =
+    // Build the x402 wrapper transaction with public inputs
+    const { transaction } =
       await this.signer.buildPrivateTransfer(
         payTo,
         BigInt(amount),
@@ -44,7 +43,6 @@ export class ExactAleoScheme implements SchemeNetworkClient {
       x402Version,
       payload: {
         transaction,
-        transitionViewKey,
         payer: this.signer.address,
       },
     };

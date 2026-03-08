@@ -10,9 +10,7 @@ import type { ClientAleoSigner } from "../signer.js";
 import {
   ALEO_API_URLS,
   ALEO_MAINNET,
-  TRANSFER_FUNCTION,
-  TRANSFER_FUNCTION_NO_CREDS,
-  GET_CREDENTIALS_FUNCTION,
+  USDCX_TRANSFER_FUNCTION,
 } from "../constants.js";
 
 export interface ClientAleoSignerOptions {
@@ -38,13 +36,11 @@ export interface ClientAleoSignerOptions {
  * Create a ClientAleoSigner from a private key string.
  *
  * This factory wraps the @provablehq/sdk Account and ProgramManager
- * to build compliant stablecoin transfer_private_with_creds transactions
- * and generate TVKs.
+ * to build x402 wrapper program transactions via `usdcx_transfer_with_proof`.
  *
- * The signer manages the Credentials record lifecycle:
+ * The signer manages the Credentials and Token record lifecycle:
  * - If a credentialsRecord is provided in options, it uses that
- * - Otherwise, callers must supply credentials via the options or
- *   obtain them externally via the get_credentials program function
+ * - If a tokenRecord is provided in options, it uses that
  *
  * @param privateKey - Aleo private key string (e.g. "APrivateKey1...")
  * @param options - Optional configuration
@@ -96,87 +92,49 @@ export function toClientAleoSigner(
       amount: bigint,
       asset: string,
       priorityFee: number = 0,
-    ): Promise<{ transaction: string; transitionViewKey: string }> {
+    ): Promise<{ transaction: string }> {
       const { programManager } = createProgramManager();
 
-      // Determine which transfer function to use based on credentials availability
-      const useCredentials = !!cachedCredentials;
-      const functionName = useCredentials
-        ? TRANSFER_FUNCTION
-        : TRANSFER_FUNCTION_NO_CREDS;
+      // Both Token and Credentials records are required for the x402 wrapper
+      if (!cachedTokenRecord) {
+        throw new Error(
+          "Token record must be provided. Set the tokenRecord option.",
+        );
+      }
+      if (!cachedCredentials) {
+        throw new Error(
+          "Credentials record must be provided. Set the credentialsRecord option.",
+        );
+      }
 
-      // Build the inputs array based on the function variant
-      //
-      // transfer_private_with_creds(recipient, amount, Token, Credentials):
-      //   - recipient: address (private)
-      //   - amount: u128 (private)
-      //   - input_record: Token.record
-      //   - credentials: Credentials.record
-      //
-      // transfer_private(recipient, amount, Token, [MerkleProof;2]):
-      //   - recipient: address (private)
-      //   - amount: u128 (private)
-      //   - input_record: Token.record
-      //   - sender_merkle_proofs: [MerkleProof;2] (private)
-      //
-      // Note: Record inputs (Token, Credentials) are resolved by the SDK's
-      // record provider — they're passed as plaintext record strings.
+      // Build the inputs array for usdcx_transfer_with_proof:
+      //   - recipient: address (public)
+      //   - amount: u128 (public)
+      //   - input_record: Token.record (private)
+      //   - credentials: Credentials.record (private)
       const inputs: string[] = [
         recipient,
         `${amount}u128`,
+        cachedTokenRecord,
+        cachedCredentials,
       ];
-
-      // Add Token record if explicitly provided
-      if (cachedTokenRecord) {
-        inputs.push(cachedTokenRecord);
-      }
-
-      // Add Credentials record for transfer_private_with_creds
-      if (useCredentials) {
-        // If we didn't push a token record above, we need to let
-        // the record provider find one — but the SDK expects inputs
-        // in positional order, so we must have the Token record first.
-        if (!cachedTokenRecord) {
-          throw new Error(
-            "Token record must be provided when using cached credentials. " +
-            "Set the tokenRecord option or let the record provider handle both.",
-          );
-        }
-        inputs.push(cachedCredentials!);
-      }
 
       const tx = await programManager.buildExecutionTransaction({
         programName: asset,
-        functionName,
+        functionName: USDCX_TRANSFER_FUNCTION,
         priorityFee,
         privateFee: false,
         inputs,
       });
 
-      // Extract the transfer transition (first one) and derive TVK
+      // Cache returned records for subsequent transfers
       const transitions = tx.transitions();
-      if (!transitions || transitions.length === 0) {
-        throw new Error("Built transaction has no transitions");
-      }
+      if (transitions && transitions.length > 0) {
+        const transferTransition = transitions[0];
 
-      const transferTransition = transitions[0];
-      const tvk = account.generateTransitionViewKey(
-        transferTransition.tpk().toString(),
-      );
-
-      // If using credentials, the returned Credentials record is in outputs.
-      // For transfer_private_with_creds, outputs are:
-      //   output[0] = Token (change, back to sender)
-      //   output[1] = Token (to recipient)
-      //   output[2] = ComplianceRecord (to investigator)
-      //   output[3] = Credentials (returned, reusable)
-      //
-      // We need to decrypt output[3] to cache the new Credentials record
-      // for the next transfer. The old one is consumed.
-      if (useCredentials) {
+        // Cache the returned Credentials record
         try {
           const outputs = transferTransition.ownedRecords(account.viewKey());
-          // Find the Credentials record among our owned outputs
           for (const record of outputs) {
             const recordStr = record.toString();
             if (recordStr.includes("freeze_list_root")) {
@@ -185,12 +143,10 @@ export function toClientAleoSigner(
             }
           }
         } catch {
-          // If we can't extract the new credentials, clear the cache.
-          // Next transfer will fall back to transfer_private with Merkle proofs.
           cachedCredentials = undefined;
         }
 
-        // Similarly, cache the change Token record for the next transfer
+        // Cache the change Token record
         try {
           const outputs = transferTransition.ownedRecords(account.viewKey());
           for (const record of outputs) {
@@ -205,10 +161,7 @@ export function toClientAleoSigner(
         }
       }
 
-      return {
-        transaction: tx.toString(),
-        transitionViewKey: tvk.toString(),
-      };
+      return { transaction: tx.toString() };
     },
   };
 }

@@ -1,10 +1,10 @@
 /**
- * Client-side signer interface for building Aleo compliant stablecoin
- * private transfer transactions.
+ * Client-side signer interface for building Aleo x402 payment transactions.
  *
  * Implementations wrap the @provablehq/sdk Account + ProgramManager to build
- * a `transfer_private_with_creds` or `transfer_private` transaction and
- * generate a Transition View Key (TVK) for selective disclosure.
+ * a `x402.aleo/usdcx_transfer_with_proof` transaction. The wrapper program
+ * exposes recipient and amount as public inputs, so the facilitator can read
+ * them directly without decryption.
  *
  * The compliant stablecoin (usdcx_stablecoin.aleo) requires freeze-list
  * compliance. The recommended flow is:
@@ -13,9 +13,8 @@
  *    in the freeze list using a Merkle proof). This only needs to happen once
  *    and is reusable until the freeze list root rotates.
  *
- * 2. Call `transfer_private_with_creds` with the Credentials record.
- *    This is faster than `transfer_private` because no Merkle proof
- *    computation is needed at transfer time.
+ * 2. Call `usdcx_transfer_with_proof` via the x402 wrapper program with
+ *    the Credentials and Token records.
  *
  * The signer implementation manages credentials lifecycle internally.
  */
@@ -24,25 +23,21 @@ export interface ClientAleoSigner {
   readonly address: string;
 
   /**
-   * Build a compliant stablecoin private transfer transaction and return
-   * it with the TVK. The transaction is fully proved but NOT broadcast.
-   *
-   * Implementations should use `transfer_private_with_creds` when a valid
-   * Credentials record is available, falling back to `transfer_private`
-   * with Merkle proofs otherwise.
+   * Build an x402 wrapper transfer transaction. The transaction is fully
+   * proved but NOT broadcast.
    *
    * @param recipient - Recipient's Aleo address
    * @param amount - Amount in micro-units (u128, e.g. 1_000_000 = 1.00 USDCx)
-   * @param asset - The stablecoin program ID (e.g. "usdcx_stablecoin.aleo")
+   * @param asset - The x402 wrapper program ID
    * @param priorityFee - Optional priority fee in microcredits (default: 0)
-   * @returns Serialized transaction string and the transition view key
+   * @returns Serialized transaction string
    */
   buildPrivateTransfer(
     recipient: string,
     amount: bigint,
     asset: string,
     priorityFee?: number,
-  ): Promise<{ transaction: string; transitionViewKey: string }>;
+  ): Promise<{ transaction: string }>;
 }
 
 /**

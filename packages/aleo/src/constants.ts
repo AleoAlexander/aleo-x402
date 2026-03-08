@@ -22,15 +22,20 @@ export const USDCX_DECIMALS = 6;
 /** USDCx multiplier for converting from whole units to micro-units */
 export const USDCX_MULTIPLIER = 10 ** USDCX_DECIMALS;
 
+/** x402 wrapper program ID on testnet */
+export const X402_PROGRAM_ID_TESTNET = "x402.aleo";
+
+/** Map network to x402 wrapper program ID */
+export const X402_PROGRAM_IDS: Record<string, string> = {
+  [ALEO_TESTNET]: X402_PROGRAM_ID_TESTNET,
+};
+
 /**
- * Transfer function names in the compliant stablecoin program.
- *
- * - transfer_private_with_creds: Uses a pre-obtained Credentials record (faster, recommended)
- * - transfer_private: Uses inline MerkleProof for freeze-list non-inclusion (slower)
+ * The transfer function in the x402 wrapper program.
+ * Takes recipient and amount as public inputs so the facilitator
+ * can read them directly without decryption.
  */
-export const TRANSFER_FUNCTION = "transfer_private_with_creds" as const;
-export const TRANSFER_FUNCTION_NO_CREDS = "transfer_private" as const;
-export const GET_CREDENTIALS_FUNCTION = "get_credentials" as const;
+export const USDCX_TRANSFER_FUNCTION = "usdcx_transfer_with_proof" as const;
 
 /** Default API endpoints for Aleo networks */
 export const ALEO_API_URLS: Record<string, string> = {

@@ -1,13 +1,10 @@
 /**
  * Aleo-specific payload carried inside PaymentPayload.payload.
- * Contains the fully-proved (but not yet broadcast) transaction,
- * a Transition View Key for selective disclosure, and the payer address.
+ * Contains the fully-proved (but not yet broadcast) transaction and the payer address.
  */
 export type ExactAleoPayload = {
   /** Serialized Aleo Transaction (JSON string) — fully proved, not yet broadcast */
   transaction: string;
-  /** Transition View Key — enables facilitator to decrypt transfer inputs */
-  transitionViewKey: string;
   /** Payer's Aleo address */
   payer: string;
 };
@@ -17,7 +14,6 @@ export type ExactAleoPayload = {
  */
 export const AleoErrorReason = {
   INVALID_TRANSACTION: "invalid_transaction",
-  INVALID_TVK: "invalid_tvk",
   RECIPIENT_MISMATCH: "recipient_mismatch",
   INSUFFICIENT_AMOUNT: "insufficient_amount",
   REPLAY_DETECTED: "replay_detected",

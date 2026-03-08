@@ -11,15 +11,13 @@ import type { FacilitatorAleoSigner } from "../../signer.js";
 import {
   SCHEME,
   ALEO_CAIP_FAMILY,
-  TRANSFER_FUNCTION,
-  TRANSFER_FUNCTION_NO_CREDS,
+  USDCX_TRANSFER_FUNCTION,
 } from "../../constants.js";
 import { AleoErrorReason } from "../../types.js";
 import {
   parseTransaction,
   getTransferTransition,
-  decryptTransition,
-  extractTransferInputs,
+  extractPublicInputs,
   extractAleoPayload,
   getTransactionId,
   isValidAleoAddress,
@@ -48,7 +46,7 @@ function cleanReplayCache(maxAgeMs: number): void {
  * 1. Parsing the serialized transaction
  * 2. Checking replay cache (reject if tx ID already seen)
  * 3. Querying the network (reject if tx already exists on-chain)
- * 4. Using the provided TVK to decrypt the transfer transition's inputs
+ * 4. Reading public inputs (recipient, amount) from the x402 wrapper transition
  * 5. Verifying recipient matches payTo and amount >= required
  *
  * Settles payments by:
@@ -145,32 +143,28 @@ export class ExactAleoScheme implements SchemeNetworkFacilitator {
         };
       }
 
-      // 6b. Verify the function is a known private transfer variant
+      // 6b. Verify the function is the x402 wrapper transfer function
       const fnName = transferTransition.functionName();
-      if (fnName !== TRANSFER_FUNCTION && fnName !== TRANSFER_FUNCTION_NO_CREDS) {
+      if (fnName !== USDCX_TRANSFER_FUNCTION) {
         return {
           isValid: false,
           invalidReason: AleoErrorReason.INVALID_TRANSACTION,
-          invalidMessage: `Transaction calls ${fnName}, expected ${TRANSFER_FUNCTION} or ${TRANSFER_FUNCTION_NO_CREDS}`,
+          invalidMessage: `Transaction calls ${fnName}, expected ${USDCX_TRANSFER_FUNCTION}`,
         };
       }
 
-      // 7. Decrypt the transition using the provided TVK
+      // 7. Read public inputs (recipient, amount) from the transition
       let recipient: string;
       let amount: bigint;
       try {
-        const decrypted = decryptTransition(
-          transferTransition,
-          aleoPayload.transitionViewKey,
-        );
-        const inputs = extractTransferInputs(decrypted);
+        const inputs = extractPublicInputs(transferTransition);
         recipient = inputs.recipient;
         amount = inputs.amount;
       } catch {
         return {
           isValid: false,
-          invalidReason: AleoErrorReason.INVALID_TVK,
-          invalidMessage: "Failed to decrypt transition with provided TVK",
+          invalidReason: AleoErrorReason.INVALID_TRANSACTION,
+          invalidMessage: "Failed to extract public inputs from transition",
         };
       }
 
