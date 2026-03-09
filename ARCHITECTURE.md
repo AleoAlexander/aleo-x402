@@ -120,11 +120,35 @@ In Aleo, every transition has a Transition Public Key (TPK). The account holder 
 
 The flow was:
 
-1. Client builds a `transfer_private_with_creds` transaction (all inputs private)
-2. Client derives the TVK from the transfer transition's TPK
-3. Client sends `{ transaction, transitionViewKey, payer }` to the facilitator
-4. Facilitator uses the TVK to decrypt the transition's private inputs
-5. Facilitator reads the decrypted recipient and amount
+```mermaid
+sequenceDiagram
+    participant P as Delegated Proving Service
+    participant C as Client
+    participant S as Resource Server
+    participant F as Facilitator
+    participant A as Aleo Network
+
+    C->>S: GET /resource
+    S-->>C: 402 { payTo, amount, asset }
+
+    C->>P: Build transfer_private_with_creds tx
+    P-->>C: Serialized transaction (ZK-proved)
+
+    Note over C: Derive TVK from transition's TPK<br/>using account private key
+
+    C->>S: GET /resource + X-PAYMENT { transaction, tvk, payer }
+    S->>F: POST /verify { transaction, tvk, payer }
+
+    Note over F: Decrypt transition with TVK<br/>Read private inputs: recipient, amount<br/>Verify: recipient === payTo<br/>Verify: amount >= required
+
+    F-->>S: { isValid: true }
+    S-->>C: 200 + resource (optimistic)
+
+    S->>F: POST /settle { transaction }
+    F->>A: Broadcast transaction
+    A-->>F: Confirmed on-chain
+    F-->>S: { success: true, txId }
+```
 
 <!-- ### Why We Moved Away
 
